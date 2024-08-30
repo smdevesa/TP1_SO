@@ -53,3 +53,7 @@ dkms.conf
 
 # Others
 .bash_history
+.DS_Store
+slave
+master
+.idea
