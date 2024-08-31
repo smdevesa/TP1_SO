@@ -95,7 +95,7 @@ int sendFileToFreeSlave(slaveManagerADT slaveManager, char *file) {
 }
 
 char * getMd5FromSlave(slaveManagerADT slaveManager) {
-    for (int i = 0; i < slaveManager->slavesQty; i++) {
+    for (int i = 0; i < slaveManager->slavesQty ; i++) {
         if (!slaveManager->slaves[i].isFree) {
             char *md5 = malloc(MD5_STRING_SIZE);
             if (md5 == NULL) {
