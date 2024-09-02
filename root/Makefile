@@ -1,22 +1,28 @@
-COMPILER = gcc
-CFLAGS = -Wall -pedantic -std=c99
+CC = gcc
+CFLAGS = -Wall -Wextra -pedantic -std=c99
 
-all: master slave
+# Targets
+TARGETS = master slave
 
-master: master.o tad/slaveManagerADT.o
-	$(COMPILER) $(CFLAGS) -o master master.o tad/slaveManagerADT.o
+# Object files
+OBJS = validate.o
 
-slave: slave.o
-	$(COMPILER) $(CFLAGS) -o slave slave.o
+all: $(TARGETS)
 
-master.o: master.c
-	$(COMPILER) $(CFLAGS) -c master.c
+master: master.o $(OBJS)
+	$(CC) $(CFLAGS) -o master master.o $(OBJS)
 
-slave.o: slave.c
-	$(COMPILER) $(CFLAGS) -c slave.c
+slave: slave.o $(OBJS)
+	$(CC) $(CFLAGS) -o slave slave.o $(OBJS)
 
-tad/slaveManagerADT.o: tad/slaveManagerADT.c
-	$(COMPILER) $(CFLAGS) -c tad/slaveManagerADT.c -o tad/slaveManagerADT.o
+validate.o: validate.c validate.h
+	$(CC) $(CFLAGS) -c validate.c
+
+master.o: master.c validate.h
+	$(CC) $(CFLAGS) -c master.c
+
+slave.o: slave.c validate.h
+	$(CC) $(CFLAGS) -c slave.c
 
 clean:
-	rm -f *.o master slave tad/*.o
+	rm -f $(TARGETS) *.o

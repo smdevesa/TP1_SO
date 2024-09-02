@@ -1,58 +1,86 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
+#include <unistd.h>
+#include <errno.h>
+#include "validate.h"
 
-#define BUFFER_SIZE 256
+#define PROGRAM "md5sum"
+#define INITIAL_SIZE 50
+#define INITIAL_LEN 7
 
-int main(void) {
-    char path[BUFFER_SIZE];
-    char md5[BUFFER_SIZE];
-    FILE *md5pipe;
+#define MALLOC_ERROR "[slave] malloc error\n"
+#define POPEN_ERROR "[slave] pipe creation error\n"
+#define GETLINE_ERROR "[slave] getline error\n"
 
-    // Set stdout to be unbuffered
-    setvbuf(stdout, NULL, _IONBF, 0);
+char * concatenatePath(char * filePath) {
+    int pathLen = strlen(filePath);
+    int commandLen = INITIAL_LEN;
 
-    fprintf(stderr, "[slave] ready\n");
-
-    while (1) {
-        // Read the file path from stdin
-        if (fgets(path, sizeof(path), stdin) == NULL) {
-            break;
-        }
-
-        // Remove newline character from path
-        path[strcspn(path, "\n")] = 0;
-
-        fprintf(stderr, "[slave] received path: %s\n", path);
-
-        // Calculate md5
-        char command[BUFFER_SIZE];
-        snprintf(command, sizeof(command), "/usr/bin/md5sum %s", path);
-        md5pipe = popen(command, "r");
-        if (md5pipe == NULL) {
-            perror("[slave] error popen");
-            return 1;
-        }
-
-        if (fgets(md5, sizeof(md5), md5pipe) == NULL) {
-            perror("[slave] error fgets");
-            pclose(md5pipe);
-            return 1;
-        }
-        pclose(md5pipe);
-
-        // Remove newline character from md5
-        md5[strcspn(md5, "\n")] = 0;
-
-        fprintf(stderr, "[slave] calculated md5: %s\n", md5);
-
-        // Send md5 to master
-        printf("%s\n", md5);
-        fflush(stdout);
+    errno = 0;
+    char * command = (char *) malloc((commandLen + pathLen + 1) * sizeof(char));
+    if(!validate(MALLOC_ERROR)) {
+        return NULL;
     }
 
-    fprintf(stderr, "[slave] finished\n");
+    strcpy(command, PROGRAM);
+    strcat(command, " ");
+    strcat(command, filePath);
+
+    return command;
+}
+
+int main(void) {
+    setvbuf(stdout, NULL, _IONBF, 0); // deshabilitar buffer de salida
+
+    char *line = NULL; // buffer para almacenar las lineas
+    size_t len = 0; // tamaño del buffer
+
+    while ((getline(&line, &len, stdin)) != -1) {
+        if (line == NULL) {
+            fprintf(stderr, GETLINE_ERROR);
+            continue;
+        }
+
+        size_t line_len = strlen(line);
+        if (line[line_len - 1] == '\n') {
+            line[line_len - 1] = '\0'; // eliminar el salto de linea
+        }
+
+        char *command = concatenatePath(line); // comando de md5sum para popen
+        if (command == NULL) {
+            continue; // si la concatenación falló, saltar a la siguiente iteración
+        }
+
+        errno = 0;
+        FILE *fp = popen(command, "r");
+        if (!validate(POPEN_ERROR)) {
+            free(command);
+            return 1;
+        }
+
+        char *md5sum = NULL; // buffer para almacenar el hash
+        size_t md5sumLen = 0; // tamaño del buffer
+        ssize_t read_len = getline(&md5sum, &md5sumLen, fp); // leer el hash
+
+        if (read_len == -1) {
+            fprintf(stderr, GETLINE_ERROR);
+            pclose(fp);
+            free(command);
+            continue;
+        }
+
+        if (md5sum[read_len - 1] == '\n') {
+            md5sum[read_len - 1] = '\0'; // eliminar el salto de linea
+        }
+        printf("%s PID: %d\n", md5sum, getpid()); // imprimir el hash y el PID
+
+        pclose(fp); // cerrar pipe
+        free(md5sum); // liberar buffer
+        free(command);
+    }
+
+    free(line);
     return 0;
 }
