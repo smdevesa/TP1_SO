@@ -1,58 +1,35 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include "validate.h"
-
-#define PROGRAM "md5sum"
-#define INITIAL_SIZE 50
-#define INITIAL_LEN 7
-
-#define MALLOC_ERROR "[slave] malloc error\n"
-#define POPEN_ERROR "[slave] pipe creation error\n"
-#define GETLINE_ERROR "[slave] getline error\n"
-
-char * concatenatePath(char * filePath) {
-    int pathLen = strlen(filePath);
-    int commandLen = INITIAL_LEN;
-
-    errno = 0;
-    char * command = (char *) malloc((commandLen + pathLen + 1) * sizeof(char));
-    if(!validate(MALLOC_ERROR)) {
-        return NULL;
-    }
-
-    strcpy(command, PROGRAM);
-    strcat(command, " ");
-    strcat(command, filePath);
-
-    return command;
-}
+#include "include/validate.h"
+#include "include/slave.h"
 
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0); // deshabilitar buffer de salida
 
-    char *line = NULL; // buffer para almacenar las lineas
-    size_t len = 0; // tamaño del buffer
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
 
-    while ((getline(&line, &len, stdin)) != -1) {
+    while ((read = getline(&line, &len, stdin)) != -1) {
         if (line == NULL) {
             fprintf(stderr, GETLINE_ERROR);
             continue;
         }
 
-        size_t line_len = strlen(line);
-        if (line[line_len - 1] == '\n') {
-            line[line_len - 1] = '\0'; // eliminar el salto de linea
+        if (line[read - 1] == '\n') {
+            line[read - 1] = '\0';
         }
 
-        char *command = concatenatePath(line); // comando de md5sum para popen
+        char *command = concatenatePath(line);
         if (command == NULL) {
-            continue; // si la concatenación falló, saltar a la siguiente iteración
+            continue;
         }
 
         errno = 0;
@@ -62,9 +39,9 @@ int main(void) {
             return 1;
         }
 
-        char *md5sum = NULL; // buffer para almacenar el hash
-        size_t md5sumLen = 0; // tamaño del buffer
-        ssize_t read_len = getline(&md5sum, &md5sumLen, fp); // leer el hash
+        char *md5sum = NULL;
+        size_t md5sumLen = 0;
+        ssize_t read_len = getline(&md5sum, &md5sumLen, fp);
 
         if (read_len == -1) {
             fprintf(stderr, GETLINE_ERROR);
@@ -74,15 +51,33 @@ int main(void) {
         }
 
         if (md5sum[read_len - 1] == '\n') {
-            md5sum[read_len - 1] = '\0'; // eliminar el salto de linea
+            md5sum[read_len - 1] = '\0';
         }
-        printf("%s PID: %d\n", md5sum, getpid()); // imprimir el hash y el PID
+        printf("%s PID: %d\n", md5sum, getpid());
 
-        pclose(fp); // cerrar pipe
-        free(md5sum); // liberar buffer
+        pclose(fp);
+        free(md5sum);
         free(command);
     }
 
     free(line);
     return 0;
+}
+
+char * concatenatePath(char * filePath) {
+    unsigned int pathLen = strlen(filePath);
+    int commandLen = INITIAL_LEN;
+
+    errno = 0;
+    char * command = (char *) malloc((commandLen + pathLen + 1) * sizeof(char));
+    if(command == NULL) {
+        perror(MALLOC_ERROR);
+        return NULL;
+    }
+
+    strcpy(command, PROGRAM);
+    strcat(command, " ");
+    strcat(command, filePath);
+
+    return command;
 }

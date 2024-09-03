@@ -59,3 +59,8 @@ master
 .idea
 .swp
 .viminfo
+
+# PVS Studio
+compile_commands.json
+PVS-Studio.log
+report.tasks
