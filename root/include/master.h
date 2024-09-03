@@ -73,11 +73,4 @@ void closeAllReadPipesAndWait(slave_t * slaves, int slavesAmount);
  */
 int sendFileToSlave(slave_t * slave, char * path, int * filesSent);
 
-/**
- * @brief Check if the given arguments are valid.
- * @param argc
- * @return 1 if the arguments are valid, 0 otherwise.
- */
-int checkArguments(int argc);
-
 #endif //TP1_SO_MASTER_H

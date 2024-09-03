@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 
 int main(int argc, char * argv[]) {
-    if(!checkArguments(argc)) {
+    if(argc < 2) {
         fprintf(stderr, ARGS_ERROR);
         return 1;
     }
@@ -68,7 +68,7 @@ int main(int argc, char * argv[]) {
             slaves[i].pid = pid;
             slaves[i].filesProcessed = 0;
 
-            for(int j=0; j<INITIAL_FILES_PER_SLAVE && filesRemaining > 0 && filesSent < fileAmount; j++) {
+            for(int j=0; j<INITIAL_FILES_PER_SLAVE && filesSent < fileAmount; j++) {
                 if(!sendFileToSlave(&slaves[i], paths[filesSent], &filesSent)) {
                     freePathArray(paths, fileAmount);
                     return 1;
@@ -199,8 +199,4 @@ int sendFileToSlave(slave_t * slave, char * path, int * filesSent) {
     }
     *filesSent += 1;
     return 1;
-}
-
-int checkArguments(int argc) {
-    return argc > 1;
 }
