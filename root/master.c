@@ -14,14 +14,17 @@
 #include <sys/wait.h>
 
 int main(int argc, char * argv[]) {
+    if(!checkArguments(argc)) {
+        fprintf(stderr, ARGS_ERROR);
+        return 1;
+    }
+
     char allWritePipesClosed = 0;
     int fileAmount = argc - 1;
     int filesRemaining = fileAmount;
     int filesSent = 0;
     int slavesAmount = calculateSlaves(fileAmount);
     slave_t slaves[slavesAmount];
-
-    fprintf(stderr, "slavesAmount: %d\n", slavesAmount);
 
     char ** paths = getPathArray(argc, argv);
     if(paths == NULL) {
@@ -196,4 +199,8 @@ int sendFileToSlave(slave_t * slave, char * path, int * filesSent) {
     }
     *filesSent += 1;
     return 1;
+}
+
+int checkArguments(int argc) {
+    return argc > 1;
 }

@@ -20,6 +20,7 @@
 #define SELECT_ERROR "[master] select error\n"
 #define PATH_ARRAY_ERROR "[master] cannot create path array. Aborting.\n"
 #define GETLINE_ERROR "[master] getline error\n"
+#define ARGS_ERROR "[master] Usage: ./master file1 file2 ... fileN\n"
 
 typedef struct slave {
     int masterToSlave[2];
@@ -71,5 +72,12 @@ void closeAllReadPipesAndWait(slave_t * slaves, int slavesAmount);
  * @return 1 if the path was sent successfully, 0 otherwise.
  */
 int sendFileToSlave(slave_t * slave, char * path, int * filesSent);
+
+/**
+ * @brief Check if the given arguments are valid.
+ * @param argc
+ * @return 1 if the arguments are valid, 0 otherwise.
+ */
+int checkArguments(int argc);
 
 #endif //TP1_SO_MASTER_H
