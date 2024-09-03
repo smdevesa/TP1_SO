@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 //
 // Created by Santiago Devesa on 31/08/2024.
 //
@@ -44,7 +46,7 @@ char ** getPathArray(int argc, char * argv[]) {
     }
 
     for(int i=1; i<argc; i++) {
-        int pathLen = strlen(argv[i]);
+        unsigned int pathLen = strlen(argv[i]);
 
         errno = 0;
         paths[i-1] = (char *) malloc((pathLen + 2) * sizeof(char));
@@ -164,7 +166,7 @@ int main(int argc, char * argv[]) {
         }
         for(int i=0; i<slavesAmount; i++) {
             if(FD_ISSET(slaves[i].slaveToMaster[0], &readfds)) {
-                int charsRead = read(slaves[i].slaveToMaster[0], buffer, BUFFER_SIZE);
+                ssize_t charsRead = read(slaves[i].slaveToMaster[0], buffer, BUFFER_SIZE);
 
                 for (int j = 0; j < charsRead && j < BUFFER_SIZE - 1; j++) {
                     if (buffer[j] == '\n') {
@@ -174,12 +176,13 @@ int main(int argc, char * argv[]) {
                         slaves[i].filesProcessed++;
                     }
 
-                }
-            }
+                    // enviar mas archivos una vez que el esclavo este libre
+                    if(slaves[i].filesProcessed >= INITIAL_FILES_PER_SLAVE && filesRemaining > 0 && filesSent < fileAmount) {
+                        write(slaves[i].masterToSlave[1], paths[filesSent], strlen(paths[filesSent]));
+                        filesSent++;
+                    }
 
-            if(slaves[i].filesProcessed >= INITIAL_FILES_PER_SLAVE && filesRemaining > 0 && filesSent < fileAmount) {
-                write(slaves[i].masterToSlave[1], paths[filesSent], strlen(paths[filesSent]));
-                filesSent++;
+                }
             }
 
             if(!allWritePipesClosed && filesRemaining == 0) {
