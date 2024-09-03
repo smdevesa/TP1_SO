@@ -65,6 +65,12 @@ void closeAllWritePipes(slave_t * slaves, int slavesAmount);
 void closeAllReadPipesAndWait(slave_t * slaves, int slavesAmount);
 
 /**
+ * @brief Close all pipes to the given slave.
+ * @param slave
+ */
+void closeAllPipesToN(slave_t * slaves, int n);
+
+/**
  * @brief Send the given path to the given slave.
  * @param slave
  * @param path

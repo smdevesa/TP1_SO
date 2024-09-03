@@ -46,11 +46,7 @@ int main(int argc, char * argv[]) {
             return 1;
         }
         if(pid == 0) {
-            // hijo
-
-            close(slaves[i].masterToSlave[1]);
-            close(slaves[i].slaveToMaster[0]);
-
+            closeAllPipesToN(slaves, i);
 
             dup2(slaves[i].masterToSlave[0], STDIN_FILENO);
             dup2(slaves[i].slaveToMaster[1], STDOUT_FILENO);
@@ -120,7 +116,7 @@ int main(int argc, char * argv[]) {
                     }
 
                     // enviar mas archivos una vez que el esclavo este libre
-                    if(slaves[i].filesProcessed >= INITIAL_FILES_PER_SLAVE && filesRemaining > 0 && filesSent < fileAmount) {
+                    if(slaves[i].filesProcessed >= INITIAL_FILES_PER_SLAVE && filesSent < fileAmount) {
                         if(!sendFileToSlave(&slaves[i], paths[filesSent], &filesSent)) {
                             freePathArray(paths, fileAmount);
                             return 1;
@@ -199,4 +195,14 @@ int sendFileToSlave(slave_t * slave, char * path, int * filesSent) {
     }
     *filesSent += 1;
     return 1;
+}
+
+void closeAllPipesToN(slave_t * slaves, int n) {
+    for(int i = 0; i < n; i++) {
+        close(slaves[i].masterToSlave[1]);
+        close(slaves[i].slaveToMaster[0]);
+    }
+
+    close(slaves[n].masterToSlave[1]);
+    close(slaves[n].slaveToMaster[0]);
 }
