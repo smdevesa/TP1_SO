@@ -64,3 +64,4 @@ master
 compile_commands.json
 PVS-Studio.log
 report.tasks
+test/*

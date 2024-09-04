@@ -7,11 +7,13 @@
 
 #include <stddef.h>
 
-typedef enum {MASTER, VIEW} mode_t;
+typedef enum {MASTER, VIEW} TMode;
 
 typedef  struct shmManagerCDT* shmManagerADT;
 
-shmManagerADT newShmManager(char* shmName, char* mutexName, size_t size, mode_t mode);
+shmManagerADT newShmManager(const char* shmName, const char* mutexName, size_t size, TMode mode);
+int shmWrite(shmManagerADT shmManager, const char* string, size_t offset, size_t size);
+int shmRead(shmManagerADT shmManager, char* dest, size_t offset, size_t size);
 void freeShmManager(shmManagerADT shmManager);
 
 
