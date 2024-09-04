@@ -5,8 +5,13 @@
 #ifndef TP1_SO_SHMMANAGER_H
 #define TP1_SO_SHMMANAGER_H
 
+#include <stddef.h>
 
-typedef  struct shmManagerCDT * shmManagerADT;
+typedef enum {MASTER, VIEW} mode_t;
+
+typedef  struct shmManagerCDT* shmManagerADT;
+
+shmManagerADT newShmManager(char* shmName, char* mutexName, size_t size, mode_t mode);
 void freeShmManager(shmManagerADT shmManager);
 
 
