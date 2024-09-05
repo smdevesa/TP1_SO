@@ -11,7 +11,10 @@
 #define SLAVE_DIVISOR 5
 #define BUFFER_SIZE 1024
 
+#define WAIT_TIME 2
+
 #define SLAVE_PATH "./slave"
+#define SHM_NAME "/sharedMemory"
 
 #define FORK_ERROR "[master] fork error\n"
 #define PIPE_ERROR "[master] pipe error\n"
