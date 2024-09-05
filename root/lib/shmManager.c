@@ -9,12 +9,14 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <unistd.h>
 
 static void freeStruct(shmManagerADT shmManager);
 static void closeSem(sem_t * sem, const char* semName);
 static void shmMapping(shmManagerADT shmManager, int def); //prot es el permiso de lectura/escritura para modulizar
 static char * allocateAndCopy(const char* string);
-static int openSemaphore(shmManagerADT shmManager);
+static int openSem(shmManagerADT shmManager);
 static int openShm(shmManagerADT shmManager);
 static shmManagerADT shmCreator(const char* shmName, const char* mutexName, size_t size, TMode mode); //crea la estructura del manejador de memoria compartida  y el semaforo
 
@@ -34,7 +36,7 @@ shmManagerADT newShmManager(const char * shmName, const char* mutexName, size_t 
         return NULL;
     }
 
-    if(openSemaphore(shmManager) == -1) {
+    if(openSem(shmManager) == -1) {
         fprintf(stderr, "[shmManager] failed to open semaphore\n");
         freeStruct(shmManager);
         return NULL;
@@ -104,7 +106,9 @@ int shmWrite(shmManagerADT shmManager, const char* string, size_t offset, size_t
         return -1;
     }
 
-    memcpy(shmManager->shmPointer + offset, string, size);
+    for(size_t i = 0; i < size; i++){
+        shmManager->shmPointer[offset + i] = string[i];
+    }
 
     if(sem_post(shmManager->mutex) == -1){
         perror("[shmManager] sem_post\n");
@@ -145,26 +149,21 @@ void freeShmManager(shmManagerADT shmManager) {
     if(shmManager != NULL) {
         closeSem(shmManager->mutex, shmManager->mutexName);
         munmap(shmManager->shmPointer, shmManager->size);
+        close(shmManager->shmId);
         shm_unlink(shmManager->shmName);
         freeStruct(shmManager);
     }
 }
 
 static void freeStruct(shmManagerADT shmManager){
-        free(shmManager->mutexName);
-        free(shmManager->shmName);
-        free(shmManager);
+    free(shmManager->mutexName);
+    free(shmManager->shmName);
+    free(shmManager);
 }
 
 static void closeSem(sem_t * sem, const char * semName){
-       if(sem_close(sem) == -1){
-              perror("Error al cerrar el semaforo");
-              return;
-       }
-        if(sem_unlink(semName) == -1){
-              perror("Error al desvincular el semaforo");
-              return;
-        }
+    sem_close(sem);
+    sem_unlink(semName);
 }
 
 static char * allocateAndCopy(const char * string) {
@@ -176,9 +175,13 @@ static char * allocateAndCopy(const char * string) {
     return ret;
 }
 
-static int openSemaphore(shmManagerADT shmManager) {
+static int openSem(shmManagerADT shmManager) {
     int flags = (shmManager->mode == MASTER) ? O_CREAT | O_EXCL : 0;
     int initialValue = (shmManager->mode == MASTER) ? 1 : 0;
+
+    if(shmManager->mode == MASTER){
+        sem_unlink(shmManager->mutexName);
+    }
 
     sem_t * retval = sem_open(shmManager->mutexName, flags, 0666, initialValue);
     if (retval == SEM_FAILED) {
@@ -192,13 +195,25 @@ static int openSemaphore(shmManagerADT shmManager) {
 
 static int openShm(shmManagerADT shmManager) {
     int mod = (shmManager->mode == MASTER) ? O_CREAT | O_EXCL | O_RDWR : O_RDONLY;
+
+    if(shmManager->mode == MASTER){
+        shm_unlink(shmManager->shmName);
+    }
+
     int retval = shm_open(shmManager->shmName, mod, 0666);
     if (retval == -1) {
         perror("[shmManager] shm_open\n");
         return -1;
     }
-
     shmManager->shmId = retval;
+
+    if (shmManager->mode == MASTER) {
+        if (ftruncate(shmManager->shmId, shmManager->size * sizeof(char)) == -1) {
+            perror("[shmManager] ftruncate");
+            close(shmManager->shmId);
+            return -1;
+        }
+    }
     return 0;
 }
 
