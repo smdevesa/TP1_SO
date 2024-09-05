@@ -56,16 +56,12 @@ int main(int argc, char * argv[]) {
         fprintf(stderr, "[view] Shared memory cant be created\n");
         return 1;
     }
-
     freeKey(key, argc);
 
-    int offset = 0;
     char buffer[BUFFER_SIZE];
     int read;
-    while((read = shmRead(shmManager, buffer, offset)) > 0) {
-        buffer[read] = '\0';
+    while((read = shmRead(shmManager, buffer)) > 0) {
         puts(buffer);
-        offset += read;
     }
     fprintf(stderr, "[view] Finished reading, read = %d\n",read);
 

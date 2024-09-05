@@ -26,8 +26,8 @@ typedef struct shmManagerCDT {
     char * shmPointer, *mutexName, *shmName;
     sem_t * mutex;
     size_t size;
+    int index;
     TMode mode;
-    char dataAvailable;
 } shmManagerCDT;
 
 shmManagerADT newShmManager(const char * shmName, const char* mutexName, size_t size, TMode mode) {
@@ -82,9 +82,9 @@ static shmManagerADT shmCreator(const char* shmName, const char* mutexName, size
         return NULL;
     }
 
-    shmManager->size = size;
+    shmManager->size = size + 1;
     shmManager->mode = mode;
-    shmManager->dataAvailable = 0;
+    shmManager->index = 0;
 
     return shmManager;
 }
@@ -94,42 +94,30 @@ static void shmMapping(shmManagerADT shmManager, int def) {
     shmManager->shmPointer = ret;
 }
 
-int shmWrite(shmManagerADT shmManager, const char* string, size_t offset, size_t size) {
-    fprintf(stderr, "shmWrite con %s\n", string);
+int shmWrite(shmManagerADT shmManager, const char* string, size_t size) {
     if(shmManager->mode == VIEW){
         perror("[shmManager] write in view\n");
         return -1;
     }
-    if((offset + size) > shmManager->size){
+    if((shmManager->index + size) > shmManager->size){
         fprintf(stderr, "[shmManager] write out of bounds\n");
         return -1;
     }
 
-    if(shmManager->dataAvailable == 0) {
-        shmManager->dataAvailable = 1;
-        if(sem_post(shmManager->mutex) == -1){
-            perror("[shmManager] sem_post\n");
-            return -1;
-        }
-    }
-    else if(sem_wait(shmManager->mutex) == -1){
-        perror("[shmManager] sem_wait\n");
-        return -1;
-    }
-    fprintf(stderr, "shmWrite pase semaforo\n");
-
-    memcpy(shmManager->shmPointer + offset, string, size);
+    memcpy(shmManager->shmPointer + shmManager->index, string, size);
 
     if(sem_post(shmManager->mutex) == -1){
         perror("[shmManager] sem_post\n");
         return -1;
     }
+    fprintf(stderr, "WRITE inc semaforo\n");
 
+    shmManager->index += size + 1;
     return size;
 }
 
-int shmRead(shmManagerADT shmManager, char* dest, size_t offset) {
-    fprintf(stderr, "shmRead\n");
+int shmRead(shmManagerADT shmManager, char* dest) {
+    fprintf(stderr, "READ intentando\n");
     if(shmManager->mode == MASTER){
         fprintf(stderr, "[shmManager] read in master\n");
         return -1;
@@ -139,25 +127,15 @@ int shmRead(shmManagerADT shmManager, char* dest, size_t offset) {
         perror("[shmManager] sem_wait\n");
         return -1;
     }
-    fprintf(stderr, "shmRead pase semaforo\n");
+    fprintf(stderr, "READ dec semaforo\n");
 
-    char c;
-    size_t count = 0;
-    while((c = shmManager->shmPointer[offset]) != '\0'){
-        if(c == '\n'){
-            return -1;
-        }
-        *dest = c;
-        dest++;
-        offset++;
-        count++;
+    int count, index = shmManager->index, size = shmManager->size;
+    for(count = 0; (index + count) < size && shmManager->shmPointer[index + count] != 0; count++){
+        dest[count] = shmManager->shmPointer[index + count];
     }
+    dest[count] = 0;
 
-    if(sem_post(shmManager->mutex) == -1){
-        perror("[shmManager] sem_post\n");
-        return -1;
-    }
-
+    shmManager->index += count + 1;
     return count;
 }
 
@@ -194,7 +172,7 @@ static char * allocateAndCopy(const char * string) {
 
 static int openSem(shmManagerADT shmManager) {
     int flags = (shmManager->mode == MASTER) ? O_CREAT | O_EXCL : 0;
-    int initialValue = (shmManager->mode == MASTER) ? 0 : 0;
+    int initialValue = 0;
 
     if(shmManager->mode == MASTER){
         sem_unlink(shmManager->mutexName);

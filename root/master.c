@@ -29,7 +29,6 @@ int main(int argc, char * argv[]) {
     int filesSent = 0;
     int slavesAmount = calculateSlaves(fileAmount);
     slave_t slaves[slavesAmount];
-    int offset = 0;
 
     shmManagerADT shmManager = newShmManager(SHM_NAME, MUTEX_KEY, DEFAULT_SHM_SIZE, MASTER);
     sleep(WAIT_TIME);
@@ -120,11 +119,10 @@ int main(int argc, char * argv[]) {
                     if (j != 0 && buffer[j] == '\n') {
                         buffer[j] = '\0';
                         filesRemaining--;
-                        if(shmWrite(shmManager, buffer, offset, j) == -1) {
+                        if(shmWrite(shmManager, buffer, j) == -1) {
                             freePathArray(paths, fileAmount);
                             return 1;
                         }
-                        offset += j;
                         slaves[i].filesProcessed++;
                     }
 
@@ -147,7 +145,7 @@ int main(int argc, char * argv[]) {
     }
 
     // marca de fin de archivo
-    shmWrite(shmManager, "", offset, 1);
+    shmWrite(shmManager, "", 1);
 
     closeAllReadPipesAndWait(slaves, slavesAmount);
     freePathArray(paths, fileAmount);
