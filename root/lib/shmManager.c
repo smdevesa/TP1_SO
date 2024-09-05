@@ -110,14 +110,14 @@ int shmWrite(shmManagerADT shmManager, const char* string, size_t size) {
         perror("[shmManager] sem_post\n");
         return -1;
     }
-    fprintf(stderr, "WRITE inc semaforo\n");
+    // fprintf(stderr, "WRITE inc semaforo\n");
 
     shmManager->index += size + 1;
     return size;
 }
 
 int shmRead(shmManagerADT shmManager, char* dest) {
-    fprintf(stderr, "READ intentando\n");
+    //fprintf(stderr, "READ intentando\n");
     if(shmManager->mode == MASTER){
         fprintf(stderr, "[shmManager] read in master\n");
         return -1;
@@ -127,7 +127,7 @@ int shmRead(shmManagerADT shmManager, char* dest) {
         perror("[shmManager] sem_wait\n");
         return -1;
     }
-    fprintf(stderr, "READ dec semaforo\n");
+    //fprintf(stderr, "READ dec semaforo\n");
 
     int count, index = shmManager->index, size = shmManager->size;
     for(count = 0; (index + count) < size && shmManager->shmPointer[index + count] != 0; count++){

@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include "include/mutex.h"
 #include "include/shmManager.h"
 
@@ -63,7 +62,6 @@ int main(int argc, char * argv[]) {
     while((read = shmRead(shmManager, buffer)) > 0) {
         puts(buffer);
     }
-    fprintf(stderr, "[view] Finished reading, read = %d\n",read);
 
     free(shmManager);
 }
