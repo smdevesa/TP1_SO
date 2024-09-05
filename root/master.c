@@ -14,12 +14,19 @@
 #include <errno.h>
 #include <sys/select.h>
 #include <sys/wait.h>
+#include <sys/fcntl.h>
+#include <sys/stat.h>
 
 int main(int argc, char * argv[]) {
     setvbuf(stdout, NULL, _IONBF, 0);
-
     if(argc < 2) {
         fprintf(stderr, ARGS_ERROR);
+        return 1;
+    }
+
+    int resultFd = open(RESULT_PATH, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    if(resultFd == -1) {
+        perror(OPEN_ERROR);
         return 1;
     }
 
@@ -44,6 +51,7 @@ int main(int argc, char * argv[]) {
         if(pipe(slaves[i].masterToSlave) == -1 || pipe(slaves[i].slaveToMaster) == -1) {
             perror(PIPE_ERROR);
             freePathArray(paths, fileAmount);
+            freeShmManager(shmManager);
             return 1;
         }
 
@@ -51,6 +59,7 @@ int main(int argc, char * argv[]) {
         if(pid == -1) {
             perror(FORK_ERROR);
             freePathArray(paths, fileAmount);
+            freeShmManager(shmManager);
             return 1;
         }
         if(pid == 0) {
@@ -65,16 +74,16 @@ int main(int argc, char * argv[]) {
             execve(SLAVE_PATH, (char *[]){SLAVE_PATH, NULL}, (char *[]){NULL});
             perror(EXECVE_ERROR);
             freePathArray(paths, fileAmount);
+            freeShmManager(shmManager);
             return 1;
         }
         else if (pid > 0){
-            // padre
             slaves[i].pid = pid;
-            slaves[i].filesProcessed = 0;
 
             for(int j=0; j<INITIAL_FILES_PER_SLAVE && filesSent < fileAmount; j++) {
                 if(!sendFileToSlave(&slaves[i], paths[filesSent], &filesSent)) {
                     freePathArray(paths, fileAmount);
+                    freeShmManager(shmManager);
                     return 1;
                 }
             }
@@ -104,6 +113,7 @@ int main(int argc, char * argv[]) {
         if(retval == -1) {
             perror(SELECT_ERROR);
             freePathArray(paths, fileAmount);
+            freeShmManager(shmManager);
             return 1;
         }
         for(int i=0; i<slavesAmount; i++) {
@@ -112,28 +122,33 @@ int main(int argc, char * argv[]) {
                 if(charsRead == -1) {
                     perror(GETLINE_ERROR);
                     freePathArray(paths, fileAmount);
+                    freeShmManager(shmManager);
                     return 1;
                 }
 
                 for (int j = 0; j < charsRead && j < BUFFER_SIZE - 1; j++) {
                     if (j != 0 && buffer[j] == '\n') {
+                        if(write(resultFd, buffer, j+1) == -1) {
+                            freeShmManager(shmManager);
+                            freePathArray(paths, fileAmount);
+                            return 1;
+                        }
                         buffer[j] = '\0';
                         filesRemaining--;
                         if(shmWrite(shmManager, buffer, j) == -1) {
+                            freeShmManager(shmManager);
                             freePathArray(paths, fileAmount);
                             return 1;
                         }
-                        slaves[i].filesProcessed++;
-                    }
 
-                    // enviar mas archivos una vez que el esclavo este libre
-                    if(slaves[i].filesProcessed >= INITIAL_FILES_PER_SLAVE && filesSent < fileAmount) {
-                        if(!sendFileToSlave(&slaves[i], paths[filesSent], &filesSent)) {
-                            freePathArray(paths, fileAmount);
-                            return 1;
+                        if(filesSent < fileAmount) {
+                            if(!sendFileToSlave(&slaves[i], paths[filesSent], &filesSent)) {
+                                freeShmManager(shmManager);
+                                freePathArray(paths, fileAmount);
+                                return 1;
+                            }
                         }
                     }
-
                 }
             }
 
@@ -147,6 +162,7 @@ int main(int argc, char * argv[]) {
     // marca de fin de archivo
     shmWrite(shmManager, "", 1);
 
+    close(resultFd);
     closeAllReadPipesAndWait(slaves, slavesAmount);
     freePathArray(paths, fileAmount);
     freeShmManager(shmManager);

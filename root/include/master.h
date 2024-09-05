@@ -15,6 +15,7 @@
 
 #define SLAVE_PATH "./slave"
 #define SHM_NAME "/sharedMemory"
+#define RESULT_PATH "resultado.txt"
 
 #define FORK_ERROR "[master] fork error\n"
 #define PIPE_ERROR "[master] pipe error\n"
@@ -24,11 +25,11 @@
 #define PATH_ARRAY_ERROR "[master] cannot create path array. Aborting.\n"
 #define GETLINE_ERROR "[master] getline error\n"
 #define ARGS_ERROR "[master] Usage: ./master file1 file2 ... fileN\n"
+#define OPEN_ERROR "[master] open error\n"
 
 typedef struct slave {
     int masterToSlave[2];
     int slaveToMaster[2];
-    unsigned int filesProcessed;
     pid_t pid;
 } slave_t;
 
