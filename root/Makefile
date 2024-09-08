@@ -9,14 +9,17 @@ OBJS = validate.o shmManager.o
 
 all: $(TARGETS)
 
-master: master.o $(OBJS)
-	$(CC) $(CFLAGS) -o master master.o $(OBJS)
+master: master.o masterlib.o $(OBJS)
+	$(CC) $(CFLAGS) -o master master.o masterlib.o $(OBJS)
 
 slave: slave.o $(OBJS)
 	$(CC) $(CFLAGS) -o slave slave.o $(OBJS)
 
 view: view.o $(OBJS)
 	$(CC) $(CFLAGS) -o view view.o $(OBJS)
+
+masterlib.o: lib/masterlib.c include/master.h
+	$(CC) $(CFLAGS) -c lib/masterlib.c
 
 validate.o: lib/validate.c include/validate.h
 	$(CC) $(CFLAGS) -c lib/validate.c

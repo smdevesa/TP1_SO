@@ -1,19 +1,12 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-//
 // Created by Santiago Devesa on 31/08/2024.
 //
-#include "include/validate.h"
 #include "include/master.h"
 #include "include/shmManager.h"
 #include "include/mutex.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-#include <errno.h>
-#include <sys/select.h>
-#include <sys/wait.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
 
@@ -24,216 +17,57 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
-    int resultFd = open(RESULT_PATH, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-    if(resultFd == -1) {
+    filesInfo_t filesInfo = {
+            .filesRemaining = argc - 1,
+            .filesSent = 0,
+            .fileAmount = argc - 1,
+            .paths = NULL
+    };
+    int slavesAmount = calculateSlaves(filesInfo.fileAmount);
+    slave_t slaves[slavesAmount];
+
+    writingInfo_t writingInfo;
+
+    writingInfo.resultFd = open(RESULT_PATH, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    if(writingInfo.resultFd == -1) {
         perror(OPEN_ERROR);
         return 1;
     }
 
-    char allWritePipesClosed = 0;
-    int fileAmount = argc - 1;
-    int filesRemaining = fileAmount;
-    int filesSent = 0;
-    int slavesAmount = calculateSlaves(fileAmount);
-    slave_t slaves[slavesAmount];
-
-    shmManagerADT shmManager = newShmManager(SHM_NAME, MUTEX_KEY, DEFAULT_SHM_SIZE, MASTER);
+    writingInfo.shmManager = newShmManager(SHM_NAME, MUTEX_KEY, DEFAULT_SHM_SIZE, MASTER);
+    if(writingInfo.shmManager == NULL) {
+        perror(SHM_ERROR);
+        freeAllResources(&filesInfo, &writingInfo);
+        return 1;
+    }
     sleep(WAIT_TIME);
     puts(SHM_NAME);
 
-    char ** paths = getPathArray(argc, argv);
-    if(paths == NULL) {
-        fprintf(stderr, PATH_ARRAY_ERROR);
+    filesInfo.paths = getPathArray(argc, argv);
+    if(filesInfo.paths == NULL) {
+        freeAllResources(&filesInfo, &writingInfo);
         return 1;
     }
 
-    for(int i=0; i<slavesAmount; i++) {
-        if(pipe(slaves[i].masterToSlave) == -1 || pipe(slaves[i].slaveToMaster) == -1) {
-            perror(PIPE_ERROR);
-            freePathArray(paths, fileAmount);
-            freeShmManager(shmManager);
-            return 1;
-        }
-
-        int pid = fork();
-        if(pid == -1) {
-            perror(FORK_ERROR);
-            freePathArray(paths, fileAmount);
-            freeShmManager(shmManager);
-            return 1;
-        }
-        if(pid == 0) {
-            closeAllPipesToN(slaves, i);
-
-            dup2(slaves[i].masterToSlave[0], STDIN_FILENO);
-            dup2(slaves[i].slaveToMaster[1], STDOUT_FILENO);
-
-            close(slaves[i].masterToSlave[0]);
-            close(slaves[i].slaveToMaster[1]);
-
-            execve(SLAVE_PATH, (char *[]){SLAVE_PATH, NULL}, (char *[]){NULL});
-            perror(EXECVE_ERROR);
-            freePathArray(paths, fileAmount);
-            freeShmManager(shmManager);
-            return 1;
-        }
-        else if (pid > 0){
-            slaves[i].pid = pid;
-
-            for(int j=0; j<INITIAL_FILES_PER_SLAVE && filesSent < fileAmount; j++) {
-                if(!sendFileToSlave(&slaves[i], paths[filesSent], &filesSent)) {
-                    freePathArray(paths, fileAmount);
-                    freeShmManager(shmManager);
-                    return 1;
-                }
-            }
-
-            close(slaves[i].masterToSlave[0]);
-            close(slaves[i].slaveToMaster[1]);
-        }
+    if(!initializeSlaves(slaves, slavesAmount)) {
+        freeAllResources(&filesInfo, &writingInfo);
+        return 1;
     }
 
-    fd_set readfds;
-    int maxFd, retval;
-    char buffer[BUFFER_SIZE];
+    if(!sendInitialFilesToSlaves(&filesInfo, slaves, slavesAmount)) {
+        freeAllResources(&filesInfo, &writingInfo);
+        return 1;
+    }
 
-    while(filesRemaining > 0) {
-        FD_ZERO(&readfds);
-        maxFd = 0;
-
-        for(int i=0; i<slavesAmount; i++) {
-            FD_SET(slaves[i].slaveToMaster[0], &readfds);
-            if(slaves[i].slaveToMaster[0] > maxFd) {
-                maxFd = slaves[i].slaveToMaster[0];
-            }
-        }
-
-        retval = select(maxFd + 1, &readfds, NULL, NULL, NULL); // esperar a que algun pipe tenga algo para leer
-
-        if(retval == -1) {
-            perror(SELECT_ERROR);
-            freePathArray(paths, fileAmount);
-            freeShmManager(shmManager);
-            return 1;
-        }
-        for(int i=0; i<slavesAmount; i++) {
-            if(FD_ISSET(slaves[i].slaveToMaster[0], &readfds)) {
-                ssize_t charsRead = read(slaves[i].slaveToMaster[0], buffer, BUFFER_SIZE);
-                if(charsRead == -1) {
-                    perror(GETLINE_ERROR);
-                    freePathArray(paths, fileAmount);
-                    freeShmManager(shmManager);
-                    return 1;
-                }
-
-                for (int j = 0; j < charsRead && j < BUFFER_SIZE - 1; j++) {
-                    if (j != 0 && buffer[j] == '\n') {
-                        if(write(resultFd, buffer, j+1) == -1) {
-                            freeShmManager(shmManager);
-                            freePathArray(paths, fileAmount);
-                            return 1;
-                        }
-                        buffer[j] = '\0';
-                        filesRemaining--;
-                        if(shmWrite(shmManager, buffer, j) == -1) {
-                            freeShmManager(shmManager);
-                            freePathArray(paths, fileAmount);
-                            return 1;
-                        }
-
-                        if(filesSent < fileAmount) {
-                            if(!sendFileToSlave(&slaves[i], paths[filesSent], &filesSent)) {
-                                freeShmManager(shmManager);
-                                freePathArray(paths, fileAmount);
-                                return 1;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if(!allWritePipesClosed && filesRemaining == 0) {
-                closeAllWritePipes(slaves, slavesAmount);
-                allWritePipesClosed = 1;
-            }
-        }
+    if(!setupSelectAndRead(&filesInfo, &writingInfo, slaves, slavesAmount)) {
+        freeAllResources(&filesInfo, &writingInfo);
+        return 1;
     }
 
     // marca de fin de archivo
-    shmWrite(shmManager, "", 1);
+    shmWrite(writingInfo.shmManager, "\0", 0);
 
-    close(resultFd);
     closeAllReadPipesAndWait(slaves, slavesAmount);
-    freePathArray(paths, fileAmount);
-    freeShmManager(shmManager);
+    freeAllResources(&filesInfo, &writingInfo);
     return 0;
-}
-
-int calculateSlaves(int fileAmount) {
-    return fileAmount / SLAVE_DIVISOR + (fileAmount % SLAVE_DIVISOR != 0);
-}
-
-void freePathArray(char ** paths, int dim) {
-    for(int i=0; i<dim; i++) {
-        free(paths[i]);
-    }
-    free(paths);
-}
-
-char ** getPathArray(int argc, char * argv[]) {
-    errno = 0;
-    char ** paths = (char **) malloc((argc - 1) * sizeof(char *));
-    if(paths == NULL) {
-        perror(MALLOC_ERROR);
-        return NULL;
-    }
-
-    for(int i=1; i<argc; i++) {
-        unsigned int pathLen = strlen(argv[i]);
-
-        errno = 0;
-        paths[i-1] = (char *) malloc((pathLen + 2) * sizeof(char));
-        if(paths[i-1] == NULL) {
-            perror(MALLOC_ERROR);
-            freePathArray(paths, i-1);
-            return NULL;
-        }
-        strcpy(paths[i-1], argv[i]);
-        strcat(paths[i-1], "\n");
-    }
-
-    return paths;
-}
-
-void closeAllWritePipes(slave_t * slaves, int slavesAmount) {
-    for(int i=0; i<slavesAmount; i++) {
-        close(slaves[i].masterToSlave[1]);
-    }
-}
-
-void closeAllReadPipesAndWait(slave_t * slaves, int slavesAmount) {
-    for(int i=0; i<slavesAmount; i++) {
-        close(slaves[i].slaveToMaster[0]);
-        waitpid(slaves[i].pid, NULL, 0);
-    }
-}
-
-int sendFileToSlave(slave_t * slave, char * path, int * filesSent) {
-    errno = 0;
-    write(slave->masterToSlave[1], path, strlen(path));
-    if(!validate(PIPE_ERROR)) {
-        return 0;
-    }
-    *filesSent += 1;
-    return 1;
-}
-
-void closeAllPipesToN(slave_t * slaves, int n) {
-    for(int i = 0; i < n; i++) {
-        close(slaves[i].masterToSlave[1]);
-        close(slaves[i].slaveToMaster[0]);
-    }
-
-    close(slaves[n].masterToSlave[1]);
-    close(slaves[n].slaveToMaster[0]);
 }
