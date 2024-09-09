@@ -64,10 +64,9 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
-    // marca de fin de archivo
-    shmWrite(writingInfo.shmManager, "\0", 0);
-
     closeAllReadPipesAndWait(slaves, slavesAmount);
+
+    shmWrite(writingInfo.shmManager, "", 1);
     freeAllResources(&filesInfo, &writingInfo);
     return 0;
 }

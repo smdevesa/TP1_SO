@@ -22,7 +22,6 @@ static int openSem(shmManagerADT shmManager);
 static int openShm(shmManagerADT shmManager);
 static shmManagerADT shmCreator(const char* shmName, const char* mutexName, size_t size, TMode mode); //crea la estructura del manejador de memoria compartida  y el semaforo
 
-
 typedef struct shmManagerCDT {
     int shmId;
     char * shmPointer, *mutexName, *shmName;
@@ -112,24 +111,23 @@ int shmWrite(shmManagerADT shmManager, const char* string, size_t size) {
         perror("[shmManager] sem_post\n");
         return -1;
     }
-    // fprintf(stderr, "WRITE inc semaforo\n");
 
     shmManager->index += size + 1;
     return size;
 }
 
 int shmRead(shmManagerADT shmManager, char* dest) {
-    //fprintf(stderr, "READ intentando\n");
     if(shmManager->mode == MASTER){
         fprintf(stderr, "[shmManager] read in master\n");
         return -1;
     }
-
     if(sem_wait(shmManager->mutex) == -1){
         perror("[shmManager] sem_wait\n");
         return -1;
     }
-    //fprintf(stderr, "READ dec semaforo\n");
+    if(shmManager->shmPointer[shmManager->index] == 0){
+        return 0;
+    }
 
     int count, index = shmManager->index, size = shmManager->size;
     for(count = 0; (index + count) < size && shmManager->shmPointer[index + count] != 0; count++){

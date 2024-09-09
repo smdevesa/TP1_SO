@@ -153,20 +153,21 @@ ssize_t readFromSlave(slave_t * slave, char * buffer) {
 }
 
 int processBuffer(char * buffer, ssize_t charsRead, int resultFd, int * filesRemaining, shmManagerADT shmManager) {
+    int offset = 0;
     for (int i = 0; i < charsRead && i < BUFFER_SIZE - 1; i++) {
         if (i != 0 && buffer[i] == '\n') {
-            if(write(resultFd, buffer, i+1) == -1) {
+            if(write(resultFd, buffer + offset, i-offset+1) == -1) {
                 return 0;
             }
-            buffer[i] = '\0';
+            buffer[i] = 0;
+            if(shmWrite(shmManager, buffer + offset, i-offset) == -1) {
+                return 0;
+            }
             *filesRemaining -= 1;
-            if(shmWrite(shmManager, buffer, i) == -1) {
-                return 0;
-            }
+            offset = i + 1;
         }
     }
     return 1;
-
 }
 
 int setupSelectAndRead(filesInfo_t * filesInfo, writingInfo_t * writingInfo, slave_t * slaves, int slavesAmount) {
