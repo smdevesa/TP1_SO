@@ -65,6 +65,8 @@ view
 compile_commands.json
 PVS-Studio.log
 report.tasks
+
+# Testing
 testfiles
 script.sh
 resultado.txt
