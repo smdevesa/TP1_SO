@@ -1,7 +1,3 @@
-//
-// Created by Santiago Devesa on 07/09/2024.
-//
-
 #include "../include/master.h"
 #include <errno.h>
 #include <stdlib.h>

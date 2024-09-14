@@ -8,12 +8,13 @@
 #include <stddef.h>
 
 #define DEFAULT_SHM_SIZE 4096
+#define MUTEX_KEY "/mutex"
 
 typedef enum {MASTER, VIEW} TMode;
 
 typedef  struct shmManagerCDT* shmManagerADT;
 
-shmManagerADT newShmManager(const char* shmName, const char* mutexName, size_t size, TMode mode);
+shmManagerADT newShmManager(const char* shmName, size_t size, TMode mode);
 int shmWrite(shmManagerADT shmManager, const char* string, size_t size);
 int shmRead(shmManagerADT shmManager, char* dest);
 void freeShmManager(shmManagerADT shmManager);

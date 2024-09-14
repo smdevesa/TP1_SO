@@ -1,8 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-//
-// Created by Tizifuchi12 on 3/9/2024.
-//
 #define _POSIX_C_SOURCE 200809L
 
 #include "../include/shmManager.h"
@@ -20,7 +15,7 @@ static void shmMapping(shmManagerADT shmManager, int def); //prot es el permiso 
 static char * allocateAndCopy(const char* string);
 static int openSem(shmManagerADT shmManager);
 static int openShm(shmManagerADT shmManager);
-static shmManagerADT shmCreator(const char* shmName, const char* mutexName, size_t size, TMode mode); //crea la estructura del manejador de memoria compartida  y el semaforo
+static shmManagerADT shmCreator(const char* shmName, size_t size, TMode mode); //crea la estructura del manejador de memoria compartida  y el semaforo
 
 typedef struct shmManagerCDT {
     int shmId;
@@ -31,8 +26,8 @@ typedef struct shmManagerCDT {
     TMode mode;
 } shmManagerCDT;
 
-shmManagerADT newShmManager(const char * shmName, const char* mutexName, size_t size, TMode mode) {
-    shmManagerADT  shmManager = shmCreator(shmName, mutexName, size, mode);
+shmManagerADT newShmManager(const char * shmName, size_t size, TMode mode) {
+    shmManagerADT  shmManager = shmCreator(shmName, size, mode);
     if (shmManager == NULL) {
         fprintf(stderr, "[shmManager] failed to create shmManager\n");
         return NULL;
@@ -64,13 +59,13 @@ shmManagerADT newShmManager(const char * shmName, const char* mutexName, size_t 
 }
 
 
-static shmManagerADT shmCreator(const char* shmName, const char* mutexName, size_t size, TMode mode) {
+static shmManagerADT shmCreator(const char* shmName, size_t size, TMode mode) {
     shmManagerADT shmManager = malloc(sizeof(struct shmManagerCDT));
     if (shmManager == NULL) {
         return NULL;
     }
 
-    shmManager->mutexName = allocateAndCopy(mutexName);
+    shmManager->mutexName = allocateAndCopy(MUTEX_KEY);
     if (shmManager->mutexName == NULL) {
         free(shmManager);
         return NULL;
