@@ -25,7 +25,7 @@ observar los resultados en tiempo real.
 ## Instalación
 
 1. Clonar el repositorio: <br> `git clone git@github.com:smdevesa/TP1_SO.git`
-2. Ingresar al directorio del repositorio: <br> `cd TP1_SO`
+2. Ingresar al directorio del repositorio: <br> `cd TP1_SO/root`
 3. Descargar la imagen de Docker: <br> `docker pull agodio/itba-so-multi-platform:3.0`
 4. Correr el contenedor: <br> `docker run -v ${PWD}:/root --privileged -ti --name SO agodio/itba-so-multi-platform:3.0`
 5. Ingresar al directorio root: <br> `cd /root`
