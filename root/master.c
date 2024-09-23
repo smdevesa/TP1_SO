@@ -35,8 +35,8 @@ int main(int argc, char * argv[]) {
         freeAllResources(&filesInfo, &writingInfo);
         return 1;
     }
-    sleep(WAIT_TIME);
     puts(SHM_NAME);
+    sleep(WAIT_TIME);
 
     filesInfo.paths = getPathArray(argc, argv);
     if(filesInfo.paths == NULL) {

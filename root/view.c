@@ -41,7 +41,7 @@ int main(int argc, char * argv[]) {
         puts(buffer);
     }
 
-    free(shmManager);
+    freeShmManager(shmManager);
 }
 
 static char * readShmKeyFromStdin() {
